@@ -1,0 +1,25 @@
+@page "/"
+@rendermode InteractiveServer
+@using Infrastructure.Interfaces
+@inject ITableService TableService
+@inject IReservationService ReservationService
+@using Domain.Filters
+<PageTitle>Главная — Reserve.</PageTitle>
+<div class="page-heading"><div><span class="eyebrow accent">ОБЗОР · RESTAURANT OS</span><h1>Добро пожаловать 👋</h1><p>Управляйте столиками, гостями и бронированиями в одном месте.</p></div><a class="button primary" href="/all-tables">Управлять столиками ↗</a></div>
+<div class="stat-grid"><div class="stat-card"><span>ВСЕГО СТОЛИКОВ</span><strong>@(tableCount?.ToString() ?? "—")</strong><small>В ресторане</small></div><div class="stat-card"><span>ВСЕГО БРОНИРОВАНИЙ</span><strong>@(reservationCount?.ToString() ?? "—")</strong><small>По данным системы</small></div><div class="stat-card"><span>ПЛАТФОРМА</span><strong>.NET 10</strong><small>Blazor · PostgreSQL</small></div></div>
+<div class="dashboard-grid"><section class="feature-panel"><span class="eyebrow">БЫСТРЫЙ СТАРТ</span><h2>Меньше рутины.<br/>Больше времени для гостей.</h2><p>Вся информация о бронированиях и посадочных местах — в удобном интерфейсе.</p><a class="button light" href="/reservations">Посмотреть бронирования →</a></section><section class="quick-panel"><h2>Быстрые действия</h2><a href="/create-table">＋ <span>Добавить столик</span> ↗</a><a href="/customers/create">＋ <span>Зарегистрировать гостя</span> ↗</a><a href="/reservations">◷ <span>Список бронирований</span> ↗</a></section></div>
+@code {
+    private int? tableCount;
+    private int? reservationCount;
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var t = await TableService.GetTablesCountAsync();
+            if (t.IsSuccess) tableCount = t.Data;
+            var r = await ReservationService.GetAllAsync(new ReservationFilter { PageNumber = 1, PageSize = 1 });
+            if (r.IsSuccess) reservationCount = r.TotalRecords;
+        }
+        catch { /* A dashboard should remain navigable while the DB is offline. */ }
+    }
+}

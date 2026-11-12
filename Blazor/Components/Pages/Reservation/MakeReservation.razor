@@ -1,0 +1,125 @@
+@page "/reserve/{TableId:int}"
+@using Infrastructure.Interfaces
+@using Domain.DTOs.ReservationDTOs
+@using Domain.DTOs.CustomerDTOs
+@inject ICustomerService CustomerService
+@inject IReservationService ReservationService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<h3>Бронирование столика</h3>
+
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="alert alert-danger">@Message</div>
+}
+@if (reservationCreated)
+{
+    <div class="alert alert-success">Бронирование успешно создано!</div>
+    <button class="btn btn-primary" @onclick="GoToReservations">Перейти к списку</button>
+}
+else
+{
+    <EditForm Model="reservation" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="form-group">
+            <label>Столик ID</label>
+            <InputNumber class="form-control" @bind-Value="reservation.TableId" readonly />
+        </div>
+
+        <div class="form-group">
+            <label>Клиент ID</label>
+            <InputNumber class="form-control" @bind-Value="reservation.CustomerId" />
+        </div>
+
+        <div class="form-group">
+            <label>Дата</label>
+            <InputDate class="form-control" @bind-Value="selectedDate" />
+        </div>
+
+        <div class="form-group">
+            <label>Время начала</label>
+            <InputSelect class="form-control" @bind-Value="selectedHourFrom">
+                @for (int h = 0; h < 24; h++)
+                {
+                    <option value="@h">@($"{h:D2}:00")</option>
+                }
+            </InputSelect>
+        </div>
+
+        <div class="form-group">
+            <label>Время окончания</label>
+            <InputSelect class="form-control" @bind-Value="selectedHourTo">
+                @for (int h = selectedHourFrom + 1; h <= 24; h++)
+                {
+                    <option value="@h">@($"{h:D2}:00")</option>
+                }
+            </InputSelect>
+        </div>
+        <br>
+        <button class="btn btn-success" type="submit">Забронировать</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int TableId { get; set; }
+
+    private CreateReservationDTO reservation = new();
+    private bool reservationCreated = false;
+    private string Message = string.Empty;
+    private DateTime selectedDate = DateTime.Today;
+    private int selectedHourFrom = 18;
+    private int selectedHourTo = 20;
+
+    protected override void OnInitialized()
+    {
+        reservation.TableId = TableId;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (selectedHourTo <= selectedHourFrom)
+        {
+            Message = "Время окончания должно быть позже начала";
+            return;
+        }
+        var customerCheck = await CustomerService.GetByIdAsync(reservation.CustomerId);
+        if (!customerCheck.IsSuccess)
+        {
+            Console.WriteLine(customerCheck.Message);
+            Message = "Ошибка: клиент с таким ID не найден.";
+            return;
+        }
+
+        reservation.ReservationDateFrom = DateTime.SpecifyKind(selectedDate.Date.AddHours(selectedHourFrom), DateTimeKind.Local).ToUniversalTime();
+
+        reservation.ReservationDateTo = DateTime.SpecifyKind(selectedDate.Date.AddHours(selectedHourTo), DateTimeKind.Local).ToUniversalTime();
+
+        var response = await ReservationService.CreateAsync(reservation);
+
+        if (response.IsSuccess)
+        {
+            reservationCreated = true;
+            ResetForm();
+        }
+        else
+        {
+            Message = response.Message ?? "Не удалось создать бронирование";
+        }
+    }
+
+    private void ResetForm()
+    {
+        reservation = new CreateReservationDTO { TableId = TableId };
+        selectedDate = DateTime.Today;
+        selectedHourFrom = 18;
+        selectedHourTo = 20;
+    }
+
+    private void GoToReservations()
+    {
+        Navigation.NavigateTo("/reservations");
+    }
+}

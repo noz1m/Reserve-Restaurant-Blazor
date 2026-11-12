@@ -1,0 +1,38 @@
+@page "/all-tables"
+@rendermode InteractiveServer
+@using Infrastructure.Interfaces
+@using Domain.DTOs.TableDTOs
+@inject ITableService TableService
+@inject NavigationManager Navigation
+<PageTitle>Столики — Reserve.</PageTitle>
+<div class="currentPage-heading"><div><span class="eyebrow accent">ПЛАН ЗАЛА</span><h1>Столики</h1><p>Управление посадочными местами и бронированием.</p></div><a class="button primary" href="/create-table">＋ Добавить столик</a></div>
+@if (!string.IsNullOrEmpty(message)) { <div class="alert alert-warning" role="alert">@message</div> }
+@if (tables is null) { <div class="empty-state">Загрузка столиков…</div> }
+else if (tables.Count == 0) { <div class="empty-state">Столиков пока нет. Добавьте первый столик.</div> }
+else { <div class="table-cards">@foreach (var table in tables) { <section class="table-card"><div class="table-visual">▦</div><div class="table-meta"><span>СТОЛИК</span><h2>№ @table.Number</h2><p>♙ @table.Seats мест</p></div><div class="card-actions"><button class="button primary" @onclick="() => ReserveTable(table.Id)">Забронировать</button><button class="button ghost danger" @onclick="() => DeleteTable(table.Id)">Удалить</button></div></section> }</div> }
+<div class="pager"><button class="button ghost" disabled="@(currentPage == 1)" @onclick="Previous">← Назад</button><span>Страница @currentPage из @Math.Max(1,totalPages) · Всего: @totalCount</span><button class="button ghost" disabled="@(currentPage >= totalPages)" @onclick="Next">Вперёд →</button></div>
+@code {
+    private List<GetTableDTO>? tables;
+    private string message = string.Empty;
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private int totalCount;
+    protected override async Task OnInitializedAsync() => await Load();
+    private async Task Load()
+    {
+        var result = await TableService.GetAllAsync(currentPage, 12);
+        if (!result.IsSuccess) { message = result.Message ?? "Ошибка загрузки"; tables = []; return; }
+        tables = result.Data ?? [];
+        totalPages = result.TotalPages;
+        totalCount = result.TotalRecords;
+    }
+    private void ReserveTable(int id) => Navigation.NavigateTo($"/reserve/{id}");
+    private async Task Previous() { if(currentPage > 1) { currentPage--; await Load(); } }
+    private async Task Next() { if(currentPage < totalPages) { currentPage++; await Load(); } }
+    private async Task DeleteTable(int id)
+    {
+        var result = await TableService.DeleteAsync(id);
+        message = result.IsSuccess ? "Столик удалён" : result.Message ?? "Не удалось удалить столик";
+        await Load();
+    }
+}
